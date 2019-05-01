@@ -1,0 +1,225 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "IoTDevKitScenerio": {
+      "type": "string",
+      "metadata": {
+        "description": "Iot DevKit Project"
+      },
+      "defaultValue": "keyword",
+      "allowedValues": [
+        "shake",
+        "flightControl",
+        "dps",
+        "translator",
+        "doorMon",
+        "keyword"
+      ]
+    },
+    "CognitiveSvcsSKU": {
+      "type": "string",
+      "metadata": {
+        "description": "SKU for TextTranslation API"
+      },
+      "defaultValue": "F0",
+      "allowedValues": [
+        "F0",
+        "S1",
+        "S2",
+        "S3",
+        "S4"
+      ]
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Specifies the location for all resources."
+      }
+    },
+    "iotHubskuName": {
+      "type": "string",
+      "defaultValue": "F1",
+      "metadata": {
+        "description": "Specifies the IotHub SKU."
+      }
+    },
+    "capacityUnits": {
+      "type": "int",
+      "minValue": 1,
+      "defaultValue": 1,
+      "metadata": {
+        "description": "Specifies the number of provisioned IoT Hub units. Restricted to 1 unit for the F1 SKU. Can be set up to maximum number allowed for subscription."
+      }
+    },
+    "iotstorageType": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_ZRS",
+        "Standard_GRS",
+        "Standard_RAGRS",
+        "Premium_LRS"
+      ]
+    },
+    "iotAppServicePlanSkuName": {
+      "type": "string",
+      "defaultValue": "F1",
+      "allowedValues": [
+        "F1",
+        "D1",
+        "B1",
+        "B2",
+        "B3",
+        "S1",
+        "S2",
+        "S3",
+        "P1",
+        "P2",
+        "P3",
+        "P4"
+      ],
+      "metadata": {
+        "description": "Describes plan's pricing tier and capacity. Check details at https://azure.microsoft.com/en-us/pricing/details/app-service/"
+      }
+    }
+  },
+  "variables": {
+
+    "iotAppserviceName": "[concat('appsvc',uniqueString(resourceGroup().id))]",
+    "iotstrName": "[concat('str', uniqueString(resourceGroup().id))]",
+    "iotappName": "[concat('app', uniqueString(resourceGroup().id))]",
+    "iothubName": "[concat('hub', uniqueString(resourceGroup().id))]",
+    "iotProvisioningSvcName": "[concat('dps', uniqueString(resourceGroup().id))]",
+    "iotCogSvcName": "[concat('cogsvc', uniqueString(resourceGroup().id))]",
+    "iotHubResourceId": "[resourceId('Microsoft.Devices/Iothubs', variables('iothubName'))]",
+    "iotHubKeyName": "iothubowner",
+    "iotHubKeyResource": "[resourceId('Microsoft.Devices/Iothubs/Iothubkeys', variables('iothubName'), variables('iotHubKeyName'))]",
+    "cognitiveservicesid": "[concat(resourceGroup().id,'/providers/','Microsoft.CognitiveServices/accounts/', variables('iotCogSvcName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Devices/IotHubs",
+      "apiVersion": "2018-04-01",
+      "name": "[variables('iothubName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+       
+      },
+      "sku": {
+        "name": "[parameters('iotHubskuName')]",
+        "capacity": "[parameters('capacityUnits')]"
+      }
+    },
+    {
+      "name": "[variables('iotstrName')]",
+      "condition": "[not(equals(parameters('IotDevKitScenerio'),'dps'))]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-01-01",
+      "sku": {
+        "name": "[parameters('iotstorageType')]"
+      },
+      "dependsOn": [],
+      "tags": {
+        "displayName": "[variables('iotstrName')]"
+      },
+      "kind": "Storage"
+    },
+    {
+      "name": "[variables('iotAppserviceName')]",
+      "condition": "[not(equals(parameters('IotDevKitScenerio'),'dps'))]",
+      "type": "Microsoft.Web/serverfarms",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-08-01",
+      "sku": {
+        "name": "[parameters('iotAppServicePlanSkuName')]"
+      },
+      "dependsOn": [],
+      "tags": {
+        "displayName": "[parameters('iotAppServicePlanSkuName')]"
+      },
+      "properties": {
+        "name": "[variables('iotAppserviceName')]",
+        "numberOfWorkers": 1
+      }
+    },
+    {
+      "name": "[variables('iotappName')]",
+      "condition": "[not(equals(parameters('IotDevKitScenerio'),'dps'))]",
+      "type": "Microsoft.Web/sites",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-08-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('iotAppserviceName'))]"
+      ],
+      "tags": {
+        "[concat('hidden-related:', resourceId('Microsoft.Web/serverfarms', variables('iotAppserviceName')))]": "Resource",
+        "displayName": "[variables('iotappName')]"
+      },
+      "properties": {
+        "name": "[variables('iotappName')]",
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('iotAppserviceName'))]"
+      }
+    },
+    {
+      "condition": "[equals(parameters('IotDevKitScenerio'), 'translator')]",
+      "type": "Microsoft.CognitiveServices/accounts",
+      "sku": {
+        "name": "[parameters('CognitiveSvcsSKU')]"
+      },
+      "kind": "TextTranslation",
+      "name": "[variables('iotCogSvcName')]",
+      "apiVersion": "2016-02-01-preview",
+      "location": "global",
+      "properties": {}
+    },
+    {
+      "apiVersion": "2017-08-21-preview",
+      "condition": "[equals(parameters('IotDevKitScenerio'), 'dps')]",
+      "type": "Microsoft.Devices/ProvisioningServices",
+      "name": "[variables('iotProvisioningSvcName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "iotHubs": [
+          {
+            "connectionString": "[concat('HostName=', reference(variables('iotHubResourceId')).hostName, ';SharedAccessKeyName=', variables('iotHubKeyName'), ';SharedAccessKey=', listkeys(variables('iotHubKeyResource'), '2017-07-01').primaryKey)]",
+            "location": "[parameters('location')]",
+            "name": "[concat(variables('iothubName'),'.azure-devices.net')]"
+
+
+          }
+        ]
+
+      }
+    }
+  ],
+  "outputs": {
+    "iotHubKeys": {
+      "value": "[listKeys(resourceId('Microsoft.Devices/iotHubs', variables('iothubName')), '2018-04-01')]",
+      "type": "object"
+    },
+    "cognitivekeys": {
+      "condition": "[equals(parameters('IotDevKitScenerio'), 'translator')]",
+      "type": "object",
+      "value": "[listKeys(variables('cognitiveservicesid'),'2016-02-01-preview')]"
+    },
+    "cognitivekey1": {
+      "condition": "[equals(parameters('IotDevKitScenerio'), 'translator')]",
+      "type": "string",
+      "value": "[listKeys(variables('cognitiveservicesid'),'2016-02-01-preview').key1]"
+    },
+    "cognitivekey2": {
+      "condition": "[equals(parameters('IotDevKitScenerio'), 'translator')]",
+      "type": "string",
+      "value": "[listKeys(variables('cognitiveservicesid'),'2016-02-01-preview').key2]"
+    },
+    "cognitiveendpoint": {
+      "condition": "[equals(parameters('IotDevKitScenerio'), 'translator')]",
+      "type": "string",
+      "value": "[reference(variables('cognitiveservicesid'),'2016-02-01-preview').endpoint]"
+    }
+  }
+}

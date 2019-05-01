@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "IoTDevKitScenerio": {
+      "value": "translator"
+    },
+    "location": {
+      "value": "westus"
+    },
+    "iotHubskuName": {
+      "value": "S1"
+    },
+    "capacityUnits": {
+      "value": 1
+    },
+    "iotstorageType": {
+      "value": "Standard_LRS"
+    },
+    "iotAppServicePlanSkuName": {
+      "value": "F1"
+    },
+    "CognitiveSvcsSKU": {
+      "value": "S1"
+    }
+  }
+}
